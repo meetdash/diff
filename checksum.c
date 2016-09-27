@@ -90,9 +90,10 @@ int *diffarray(track *dif, int len) {
 }
 
 int main(int argc, char *argv[]) {
-	int i, j, z, size, size_c, len1, len2, *arr_dif;
-	char *line;
+	int i, j, size, size_c, count, len1, len2, *arr_dif;
+	char *line, *p;
 	char line_char;
+	size_t p_size;
 	uint32_t *cksum1, *cksum2;
 	FILE *fd1, *fd2, *fcs1, *fcs2;
 	track *t_dif;
@@ -100,6 +101,8 @@ int main(int argc, char *argv[]) {
 	size = 20;
 	size_c = 10;
 	line_char = '\0';
+	p = NULL;
+	p_size = 0;
 	cksum1 = (uint32_t *)malloc(sizeof(uint32_t) * size_c);
 	cksum2 = (uint32_t *)malloc(sizeof(uint32_t) * size_c);
 
@@ -186,10 +189,17 @@ int main(int argc, char *argv[]) {
 	t_dif = diff(cksum1, cksum2, len1, len2);
 	arr_dif = diffarray(t_dif, len1);
 
-	i = 0;
+	i = 0; count = 0;
+	rewind(fd1);
 	while (arr_dif[i] != INT_MAX) {
-		z = arr_dif[i];
-		printf("- line %d\n", z + 1);
+		while (!feof(fd1)) {
+			getline(&p, &p_size, fd1);
+			if (count == arr_dif[i])
+				printf("- %s", p);
+			count++;
+			if (count > arr_dif[i])
+				break;
+		}
 		i++;
 	}
 
