@@ -1,12 +1,9 @@
-apples
 oranges
+apples
 
 bananas
 chikoo
 
 
-
-pears
-
+papaya
 mango
-strawberry

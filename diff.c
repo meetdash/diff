@@ -1,11 +1,21 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 #include <stdint.h>
 #include <inttypes.h>
 #include <limits.h>
 
 #define MAX 128
+
+void usage(void) {
+	printf("DIFF Implementation\nThis programs compares two files.\n");
+	printf("The command line address should be: './diff filename1 filename2' \n");
+}
+
+int icomp (const void *a, const void *b) {
+	return ( *(int *)a - *(int *)b );
+}
 
 const int MOD_CS = 65521;
 
@@ -18,7 +28,7 @@ uint32_t checksum (char *line, size_t len) {
 	uint32_t a = 1, b = 0;
 	size_t index;
 
-	for (index = 0; index < len; ++index) {
+	for (index = 0; index < len; index++) {
 		a = (a + line[index]) % MOD_CS;
 		b = (b + a) % MOD_CS;
 	}
@@ -28,45 +38,54 @@ uint32_t checksum (char *line, size_t len) {
 
 void merge(file *a, int i1, int j1, int i2, int j2);
 void mergesort(file *a, int i, int j) {
-        int mid;
+	int mid;
 
-        if(i < j) {
-                mid = (i + j) / 2;
-                mergesort(a, i, mid);
-                mergesort(a, mid + 1, j);
-                merge(a, i, mid, mid + 1, j);
-        }
+	if(i < j) {
+		mid = (i + j) / 2;
+		mergesort(a, i, mid);
+		mergesort(a, mid + 1, j);
+		merge(a, i, mid, mid + 1, j);
+	}
 }
 
 void merge(file *a, int i1, int j1, int i2, int j2) {
-        uint32_t *temp;
-        int i, j, k;
-        i = i1;
-        j = i2;
-        k = 0;
+	file *temp;
+	int i, j, k;
+	i = i1;
+	j = i2;
+	k = 0;
 
-        temp = (uint32_t *)malloc(sizeof(uint32_t) * j2 + 1);
+	temp = (file *)malloc(sizeof(file) * j2 + 1);
 	if (temp == NULL) {
 		printf("Malloc Failed.\n");
 		exit(1);
 	}
 
-        while(i <= j1 && j <= j2)
-                if(a[i].cksum < a[j].cksum)
-                        temp[k++] = a[i++].cksum;
-                else
-                        temp[k++] = a[j++].cksum;
+	while(i <= j1 && j <= j2)
+		if(a[i].cksum < a[j].cksum) {
+			temp[k].cksum = a[i].cksum;
+			temp[k++].line = a[i++].line;
+		} else {
+			temp[k].cksum = a[j].cksum;
+			temp[k++].line = a[j++].line;
+		}
 
-        while(i <= j1)
-                temp[k++] = a[i++].cksum;
+	while(i <= j1) {
+		temp[k].cksum = a[i].cksum;
+		temp[k++].line = a[i++].line;
+	}
 
-        while(j <= j2)
-                temp[k++] = a[j++].cksum;
+	while(j <= j2) {
+		temp[k].cksum = a[j].cksum;
+		temp[k++].line = a[j++].line;
+	}
 
-        for(i = i1, j = 0; i <= j2; i++, j++)
-                a[i].cksum = temp[j];
+	for(i = i1, j = 0; i <= j2; i++, j++) {
+		a[i].cksum = temp[j].cksum;		
+		a[i].line = temp[j].line;		
+	}
 
-        free(temp);
+	free(temp);
 }
 
 typedef struct track {
@@ -120,29 +139,37 @@ track *rmdif (file *cs1, file *cs2, int size_cs1, int size_cs2) {
 	return dif;
 }
 
-int *rmdifarray(track *dif, int len) {
-	int j, k, *array;
-	array = (int *)malloc(sizeof(int) * len);
-	if (array == NULL) {
+int *rmdifarray(track *dif, int *len) {
+	int i, k, *arr;
+
+	arr = (int *)malloc(sizeof(int) * (*len));
+	if (arr == NULL) {
 		printf("Malloc Failed.\n");
 		exit(1);
 	}
 
-	k = 0; j = 0;
-	while (k < len) {
+	k = 0; i = 0;
+	while (k < *len) {
 		if (dif[k].t2 == NULL) {
-			array[j] = k;
-			j++;
+			arr[i] = dif[k].t1->line;
+			i++;
 		}
 		k++;
 	}
-	array[j] = INT_MAX;
+	*len = i;
 
-	return array;
+	return arr;
 }
 
 int main(int argc, char *argv[]) {
-	int i, j, size, size_f, count, len1, len2, *rmarr1, *rmarr2;
+
+	if (strcmp(argv[1], "-h") == 0) {
+		usage();
+		return 0;
+	} else {
+// program 
+
+	int i, j, size, size_f, count, len1, len2, *rmarr1, *rmarr2, n1, n2;
 	char *line, *p;
 	char line_char;
 	size_t p_size;
@@ -187,7 +214,7 @@ int main(int argc, char *argv[]) {
 				size *= 2;
 				line = (char *)realloc(line, sizeof(char) * size);
 			}
-			fread(&line_char, 1, 1, fd1);
+			 fread(&line_char, 1, 1, fd1);
 		}
 		line[i] = '\0';
 		file1[j].cksum = checksum(line, i);
@@ -200,7 +227,7 @@ int main(int argc, char *argv[]) {
 			file1 = (file *)realloc(file1, sizeof(file) * size_f);
 		}
 	}
-	len1 = j;
+	len1 = j - 1;
 	mergesort(file1, 0, len1 - 1);
 
 	fcs1 = fopen("checksum_file1.txt", "w");
@@ -210,7 +237,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	for (i = 0; i < len1; i++)
-		fprintf(fcs1, "%d %" PRIu32 "\n", file1[i].line, file1[j].cksum);
+		fprintf(fcs1, "%d %" PRIu32 "\n", file1[i].line, file1[i].cksum);
 
 	j = 0;
 	while (!feof(fd2)) {
@@ -236,7 +263,7 @@ int main(int argc, char *argv[]) {
 			file2 = (file *)realloc(file2, sizeof(file) * size_f);
 		}
 	}
-	len2 = j;
+	len2 = j - 1;
 	mergesort(file2, 0, len2 - 1);
 
 	fcs2 = fopen("checksum_file2.txt", "w");
@@ -248,20 +275,24 @@ int main(int argc, char *argv[]) {
 		fprintf(fcs2, "%d %" PRIu32 "\n", file2[i].line, file2[i].cksum);
 
 	t_dif1 = rmdif(file1, file2, len1, len2);
-	rmarr1 = rmdifarray(t_dif1, len1);
+	n1 = len1;
+	rmarr1 = rmdifarray(t_dif1, &n1);
+	qsort(rmarr1, n1, sizeof(int), icomp);
 
 	t_dif2 = rmdif(file2, file1, len2, len1);
-	rmarr2 = rmdifarray(t_dif2, len2);
+	n2 = len2;
+	rmarr2 = rmdifarray(t_dif2, &n2);
+	qsort(rmarr2, n2, sizeof(int), icomp);
 
 	i = 0; count = 1;
 	rewind(fd1);
-	while (rmarr1[i] != INT_MAX) {
+	while (i < n1) {
 		while (!feof(fd1)) {
 			getline(&p, &p_size, fd1);
-			if (count == rmarr1[i] + 1) 
+			if (count == rmarr1[i]) 
 				printf("- %s", p);
 			count++;
-			if (count > rmarr1[i] + 1)
+			if (count > rmarr1[i])
 				break;
 		}
 		i++;
@@ -269,13 +300,13 @@ int main(int argc, char *argv[]) {
 
 	i = 0; count = 1;
 	rewind(fd2);
-	while (rmarr2[i] != INT_MAX) {
+	while (i != n2) {
 		while (!feof(fd2)) {
 			getline(&p, &p_size, fd2);
-			if (count == rmarr2[i] + 1)
+			if (count == rmarr2[i])
 				printf("+ %s", p);
 			count++;
-			if (count > rmarr2[i] + 1)
+			if (count > rmarr2[i])
 				break;
 		}
 		i++;
@@ -294,4 +325,6 @@ int main(int argc, char *argv[]) {
 	fclose(fcs2);
 
 	return 0;
+
+	} // end else
 }
