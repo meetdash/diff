@@ -151,6 +151,10 @@ int *rmdifarray(track *dif, int *len) {
 	k = 0; i = 0;
 	while (k < *len) {
 		if (dif[k].t2 == NULL) {
+			if (dif[k].t1->cksum == 1) {
+				k++;
+				continue;
+			}
 			arr[i] = dif[k].t1->line;
 			i++;
 		}
@@ -219,9 +223,9 @@ int main(int argc, char *argv[]) {
 		line[i] = '\0';
 		file1[j].cksum = checksum(line, i);
 		file1[j].line = j + 1;
-		if (file1[j].cksum == 1)
+/*		if (file1[j].cksum == 1)
 			file1[j].cksum += j;
-		j++;
+*/		j++;
 		if (j == size_f) {
 			size_f *= 2;
 			file1 = (file *)realloc(file1, sizeof(file) * size_f);
@@ -255,9 +259,9 @@ int main(int argc, char *argv[]) {
 		line[i] = '\0';
 		file2[j].cksum = checksum(line, i);
 		file2[j].line = j + 1;
-		if (file2[j].cksum == 1)
+/*		if (file2[j].cksum == 1)
 			file2[j].cksum += j;
-		j++;
+*/		j++;
 		if (j == size_f) {
 			size_f *= 2;
 			file2 = (file *)realloc(file2, sizeof(file) * size_f);
@@ -287,7 +291,7 @@ int main(int argc, char *argv[]) {
 	i = 0; count = 1;
 	rewind(fd1);
 	while (i < n1) {
-		while (!feof(fd1)) {
+		while (!feof(fd1)) {			
 			getline(&p, &p_size, fd1);
 			if (count == rmarr1[i]) 
 				printf("- %s", p);
