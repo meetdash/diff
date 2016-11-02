@@ -1,3 +1,20 @@
+/*****************************************************************************
+ * Copyright (C) Dashmeet Kaur Ajmani dashmeetajmani@gmail.com
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 2.1 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program; If not, see <http://www.gnu.org/licenses/>.
+ *****************************************************************************/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,11 +31,7 @@
 
 void usage(void) {
 	printf("DIFF Implementation\nThis programs compares two files.\n");
-	printf("The command line address should be: './diff filename1 filename2' \n");
-}
-
-int icomp (const void *a, const void *b) {
-	return ( *(int *)a - *(int *)b );
+	printf("The command line address should be: './project filename1 filename2' \n");
 }
 
 const int MOD_CS = 65521;
@@ -38,55 +51,6 @@ uint32_t checksum (char *line, size_t len) {
 	}
 
 	return (b << 16) | a;
-}
-
-void merge(file *a, int i1, int j1, int i2, int j2);
-void mergesort(file *a, int i, int j) {
-	int mid;
-
-	if(i < j) {
-		mid = (i + j) / 2;
-		mergesort(a, i, mid);
-		mergesort(a, mid + 1, j);
-		merge(a, i, mid, mid + 1, j);
-	}
-}
-
-void merge(file *a, int i1, int j1, int i2, int j2) {
-	file *temp;
-	int i, j, k;
-	i = i1;
-	j = i2;
-	k = 0;
-
-	temp = (file *)malloc(sizeof(file) * j2 + 1);
-	MALFAIL(temp);
-
-	while(i <= j1 && j <= j2)
-		if(a[i].cksum < a[j].cksum) {
-			temp[k].cksum = a[i].cksum;
-			temp[k++].line = a[i++].line;
-		} else {
-			temp[k].cksum = a[j].cksum;
-			temp[k++].line = a[j++].line;
-		}
-
-	while(i <= j1) {
-		temp[k].cksum = a[i].cksum;
-		temp[k++].line = a[i++].line;
-	}
-
-	while(j <= j2) {
-		temp[k].cksum = a[j].cksum;
-		temp[k++].line = a[j++].line;
-	}
-
-	for(i = i1, j = 0; i <= j2; i++, j++) {
-		a[i].cksum = temp[j].cksum;		
-		a[i].line = temp[j].line;		
-	}
-
-	free(temp);
 }
 
 typedef struct track {
@@ -138,12 +102,11 @@ track diff (file *cs1, file *cs2, int size_cs1, int size_cs2) {
 
 	return dif;
 }
-// ----------- start of ndiff functions
 
 int SIZE = 8;
 
 typedef struct ndata {
-	char ch;
+	char ch, *str;
 	int lnum;
 	struct ndata *next;
 }ndata;
@@ -151,7 +114,7 @@ typedef struct ndata {
 ndata **ndiff;
 
 void ninit () {
-	ndiff = (ndata **)malloc(sizeof(struct ndata *) * SIZE);
+	ndiff = (ndata **)calloc(SIZE, sizeof(struct ndata *) * SIZE);
 	MALFAIL(ndiff);
 	int i;
 	for (i = 0; i < SIZE; i++)
@@ -177,18 +140,19 @@ void nstore (ndata d, int i) {
 	return;
 }
 
-void ndiffsort (track dif, int l1, int l2) {
-	int i, j, k;
+void ndiffsort (track dif, int l1, int l2, char *f1[], char *f2[]) {
+	int i, j, k, z;
 	ndata d;
 	ninit();
 
 	k = 0; i = 0; j = 0;
-	while (i < l1 || j < l2) {
+	while (i < l1 && j < l2) {
 		if (dif.visit1[i] == 0) {
 			if (dif.visit2[j] == 1) {
 				while (dif.visit1[i] == 0) {
 					d.lnum = i + 1;
 					d.ch = '-';
+					d.str = f1[i];
 					d.next = NULL;
 					nstore(d, k);
 					i++;
@@ -198,6 +162,7 @@ void ndiffsort (track dif, int l1, int l2) {
 				while (dif.visit1[i] == 0) {
 					d.lnum = i + 1;
 					d.ch = '-';
+					d.str = f1[i];
 					d.next = NULL;
 					nstore(d, k);
 					i++;
@@ -205,6 +170,7 @@ void ndiffsort (track dif, int l1, int l2) {
 				while (dif.visit2[j] == 0) {
 					d.lnum = j + 1;
 					d.ch = '+';
+					d.str = f2[j];
 					d.next = NULL;
 					nstore(d, k);
 					j++;
@@ -216,6 +182,7 @@ void ndiffsort (track dif, int l1, int l2) {
 				while (dif.visit2[j] == 0) {
 					d.lnum = j + 1;
 					d.ch = '+';
+					d.str = f2[j];
 					d.next = NULL;
 					nstore(d, k);
 					j++;
@@ -228,16 +195,19 @@ void ndiffsort (track dif, int l1, int l2) {
 		if (k == SIZE) {
 			SIZE *= 2;
 			ndiff = (ndata **)realloc(ndiff, sizeof(ndata *) * SIZE);
+			for (z = k; z < SIZE; z++)
+				ndiff[z] = NULL;
 		}
 	}
 
-	if (j < l2) {
+	while (j < l2) {
 		if (dif.visit2[j] == 1)
 			j++;
 		else {
 			while (dif.visit2[j] == 0) {
 				d.lnum = j + 1;
 				d.ch = '+';
+				d.str = f2[j];
 				d.next = NULL;
 				nstore(d, k);
 				j++;
@@ -248,17 +218,20 @@ void ndiffsort (track dif, int l1, int l2) {
 			if (k == SIZE) {
 				SIZE *= 2;
 				ndiff = (ndata **)realloc(ndiff, sizeof(ndata *) * SIZE);
+				for (z = k; z < SIZE; z++)
+					ndiff[z] = NULL;
 			}
 		}
 	}
 
-	if (i < l1) {
+	while (i < l1) {
 		if (dif.visit1[i] == 1)
 			i++;
 		else {
 			while (dif.visit1[i] == 0) {
 				d.lnum = i + 1;
 				d.ch = '-';
+				d.str = f1[i];
 				d.next = NULL;
 				nstore(d, k);
 				i++;
@@ -269,106 +242,50 @@ void ndiffsort (track dif, int l1, int l2) {
 			if (k == SIZE) {
 				SIZE *= 2;
 				ndiff = (ndata **)realloc(ndiff, sizeof(ndata *) * SIZE);
+				for (z = k; z < SIZE; z++)
+					ndiff[z] = NULL;
 			}
 		}
 	}
 
 }
 
-void printndiff(char *rm[], char *ad[]) {
+void printndiff() {
+	int j;
 	ndata *p, *q;
-	p = ndiff[0];
-	int i, j, k;
 
-	i = 0; j = 0; k = 0;
+	j = 0;
+	p = ndiff[j];
+
 	while (p) {
 		if (p->ch == '-') {
 			if (p->next == NULL)
-				printf("%dd\n< %s", p->lnum, rm[i++]);
+				printf("%dd\n< %s", p->lnum, p->str);
 			else {
 				q = p;
 				while (q->ch == '-')
 					q = q->next;
 				printf("%dc%d\n", p->lnum, q->lnum);
 				while (p->ch == '-') {
-					printf("< %s", rm[i++]);
+					printf("< %s", p->str);
 					p = p->next;
 				}
 				printf("-----\n");
 				while (p) {
-					printf("> %s", ad[k++]);
+					printf("> %s", p->str);
 					p = p->next;
 				}
 			}
 		} else {
 			printf("%da\n", p->lnum);
 			while (p) {
-				printf("> %s", ad[k++]);
-					p = p->next;
+				printf("> %s", p->str);
+				p = p->next;
 			}
 		}
 		j++;
 		p = ndiff[j];
 	}
-
-}
-// ----------- end of ndiff functions
-
-// ----------- start of udiff functions
-
-typedef struct udata {
-	char ch;
-	char *from, *to;
-	struct udata *next;
-}udata;
-
-udata **udiff;
-
-void uinit() {
-	udiff = (udata **)malloc(sizeof(udata *) * SIZE);
-	MALFAIL(udiff);
-	int i;
-	for (i = 0; i < SIZE; i++) {
-		udiff[i] = NULL;
-	}
-}
-
-void ustore (udata d, int i) {
-	udata *tmp, *p;
-
-	tmp = (udata *)malloc(sizeof(udata));
-	MALFAIL(tmp);
-	*tmp = d;
-
-	p = udiff[i];
-	if (p == NULL)
-		udiff[i] = tmp;
-	else {
-		while (p->next != NULL)
-			p = p->next;
-		p->next = tmp;
-	}
-
-}
-
-void udiffsort () {
-
-
-	
-
-
-}
-
-void printudiff() {
-
-
-
-
-
-
-}
-
-void printcdiff() {
 
 }
 
@@ -381,11 +298,11 @@ int main(int argc, char *argv[]) {
 // program 
 
 	int i, j, size, size_f, len1, len2, n1, n2;
-	char *line, *p, **rmlines, **adlines;
+	char *line, *p, **f2, **f1;
 	char line_char;
 	size_t p_size;
 	file *file1, *file2;
-	FILE *fd1, *fd2, *fcs1, *fcs2;
+	FILE *fd1, *fd2;
 	track dif;
 
 	size = 20;
@@ -393,10 +310,6 @@ int main(int argc, char *argv[]) {
 	line_char = '\0';
 	p = NULL;
 	p_size = 0;
-	file1 = (file *)malloc(sizeof(file) * size_f);
-	MALFAIL(file1);
-	file2 = (file *)malloc(sizeof(file) * size_f);
-	MALFAIL(file2);
 
 	if (argc != 3) {
 		printf("Address of the type: ./program file1 file2\n");
@@ -415,6 +328,8 @@ int main(int argc, char *argv[]) {
 		return errno;
 	}
 
+	file1 = (file *)malloc(sizeof(file) * size_f);
+	MALFAIL(file1);
 	line = (char *)malloc(sizeof(char) * size);
 	MALFAIL(line);
 	j = 0;
@@ -433,26 +348,16 @@ int main(int argc, char *argv[]) {
 		line[i] = '\0';
 		file1[j].cksum = checksum(line, i);
 		file1[j].line = j + 1;
-/*		if (file1[j].cksum == 1)
-			file1[j].cksum += j;
-*/		j++;
+		j++;
 		if (j == size_f) {
 			size_f *= 2;
 			file1 = (file *)realloc(file1, sizeof(file) * size_f);
 		}
 	}
 	len1 = j - 1;
-//	mergesort(file1, 0, len1 - 1);
 
-	fcs1 = fopen("checksum_file1.txt", "w");
-	if (fcs1 == NULL) {
-		perror("Couldn't write checksum of file1: ");
-		return errno;
-	}
-
-	for (i = 0; i < len1; i++)
-		fprintf(fcs1, "%d %" PRIu32 "\n", file1[i].line, file1[i].cksum);
-
+	file2 = (file *)malloc(sizeof(file) * size_f);
+	MALFAIL(file2);
 	j = 0;
 	while (!feof(fd2)) {
 		i = 0;
@@ -469,85 +374,69 @@ int main(int argc, char *argv[]) {
 		line[i] = '\0';
 		file2[j].cksum = checksum(line, i);
 		file2[j].line = j + 1;
-/*		if (file2[j].cksum == 1)
-			file2[j].cksum += j;
-*/		j++;
+		j++;
 		if (j == size_f) {
 			size_f *= 2;
 			file2 = (file *)realloc(file2, sizeof(file) * size_f);
 		}
 	}
 	len2 = j - 1;
-//	mergesort(file2, 0, len2 - 1);
-
-	fcs2 = fopen("checksum_file2.txt", "w");
-	if (fcs2 == NULL) {
-		perror("Couldn't write checksum of file2: ");
-		return errno;
-	}
-	for (i = 0; i < len2; i++)
-		fprintf(fcs2, "%d %" PRIu32 "\n", file2[i].line, file2[i].cksum);
 
 	dif = diff (file1, file2, len1, len2);
 
-	rmlines = (char **)malloc(sizeof(char *) * size_f);
-	MALFAIL(rmlines);
+	f1 = (char **)malloc(sizeof(char *) * size_f);
+	MALFAIL(f1);
 	i = 0; j = 0;
 	rewind(fd1);
 	while (!feof(fd1)) {			
 		getline(&p, &p_size, fd1);
-		if (dif.visit1[i] == 0) {
-			rmlines[j] = (char *)malloc(sizeof(char) * p_size);
-			MALFAIL(rmlines[j]);
-			strcpy(rmlines[j], p);
-			j++;
-			if (j == size_f) {
-				size_f *= 2;
-				rmlines = (char **)realloc(rmlines, sizeof(char *) * size_f);
-			}
+		f1[j] = (char *)malloc(sizeof(char) * p_size);
+		MALFAIL(f1[j]);
+		strcpy(f1[j], p);
+		j++;
+		if (j == size_f) {
+			size_f *= 2;
+			f1 = (char **)realloc(f1, sizeof(char *) * size_f);
 		}
 		i++;
 	}
 	n1 = j;
 
-	adlines = (char **)malloc(sizeof(char *) * size_f);
-	MALFAIL(adlines);
+	f2 = (char **)malloc(sizeof(char *) * size_f);
+	MALFAIL(f2);
 	i = 0; j = 0;
 	rewind(fd2);
 	while (!feof(fd2)) {			
 		getline(&p, &p_size, fd2);
-		if (dif.visit2[i] == 0) {
-			adlines[j] = (char *)malloc(sizeof(char) * p_size);
-			MALFAIL(adlines[j]);
-			strcpy(adlines[j], p);
-			j++;
-			if (j == size_f) {
-				size_f *= 2;
-				adlines = (char **)realloc(adlines, sizeof(char *) * size_f);
-			}
+		f2[j] = (char *)malloc(sizeof(char) * p_size);
+		MALFAIL(f2[j]);
+		strcpy(f2[j], p);
+		j++;
+		if (j == size_f) {
+			size_f *= 2;
+			f2 = (char **)realloc(f2, sizeof(char *) * size_f);
 		}
 		i++;
 	}
 	n2 = j;
 
-	ndiffsort(dif, len1, len2);
-	printndiff(rmlines, adlines);
+	ndiffsort(dif, len1, len2, f1, f2);
+	printndiff();
 
 	for (i = 0; i < n1; i++)
-		free(rmlines[i]);
+		free(f1[i]);
 	for (i = 0; i < n2; i++)
-		free(adlines[i]);
-	free(rmlines);
-	free(adlines);
+		free(f2[i]);
+	free(f1);
+	free(f2);
 	free(file1);
 	free(file2);
 	free(line);
+	free(p);
 	free(dif.visit1);
 	free(dif.visit2);
 	fclose(fd1);
 	fclose(fd2);
-	fclose(fcs1);
-	fclose(fcs2);
 
 	return 0;
 
